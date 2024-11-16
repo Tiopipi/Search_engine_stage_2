@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Index Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .search-container, .metadata-search-container {
+            margin-bottom: 20px;
+        }
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .result-box {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+        .result-box h3 {
+            margin-top: 0;
+        }
+        .result {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        form label {
+            margin-top: 10px;
+            display: block;
+        }
+        form input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        form input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        form input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Search Index Results</h2>
+
+<div class="search-container">
+    <label for="query-unique">Enter a word to search in Unique Index:</label>
+    <input type="text" id="query-unique" placeholder="e.g., african people">
+    <button onclick="searchUnique()">Search Unique</button>
+    <div class="result-box" id="unique-results">
+        <h3>Unique Index Results</h3>
+        <div id="unique-output">No results yet.</div>
+    </div>
+</div>
+
+<div class="search-container">
+    <label for="query-hierarchical">Enter a word to search in Hierarchical Index:</label>
+    <input type="text" id="query-hierarchical" placeholder="e.g., african people">
+    <button onclick="searchHierarchical()">Search Hierarchical</button>
+    <div class="result-box" id="hierarchical-results">
+        <h3>Hierarchical Index Results</h3>
+        <div id="hierarchical-output">No results yet.</div>
+    </div>
+</div>
+
+<div class="search-container">
+    <label for="query-tree">Enter a word to search in Tree Index:</label>
+    <input type="text" id="query-tree" placeholder="e.g., african people">
+    <button onclick="searchTree()">Search Tree</button>
+    <div class="result-box" id="tree-results">
+        <h3>Tree Index Results</h3>
+        <div id="tree-output">No results yet.</div>
+    </div>
+</div>
+
+<h2>Metadata Search</h2>
+<form id="metadata-search-form">
+    <label for="title">Title:</label>
+    <input type="text" id="title" name="title">
+
+    <label for="author">Author:</label>
+    <input type="text" id="author" name="author">
+
+    <label for="language">Language:</label>
+    <input type="text" id="language" name="language">
+
+    <label for="year">Year:</label>
+    <input type="number" id="year" name="year" min="1900" max="2100" placeholder="YYYY">
+
+    <label for="month">Month:</label>
+    <input type="number" id="month" name="month" min="1" max="12" placeholder="MM">
+
+    <label for="day">Day:</label>
+    <input type="number" id="day" name="day" min="1" max="31" placeholder="DD">
+
+    <input type="submit" value="Search Metadata">
+</form>
+
+<div id="result-metadata" class="result" style="display: none;">
+    <h3>Metadata Result:</h3>
+    <div id="results-container-metadata"></div>
+</div>
+<script>
+    async function searchUnique() {
+        const query = document.getElementById("query-unique").value.trim();
+        if (!query) {
+            alert("Please enter a search query.");
+            return;
+        }
+
+        document.getElementById("unique-output").innerText = 'Loading...';
+
+        try {
+            const uniqueData = await fetchData(`http://localhost:8080/search/unique?query=${encodeURIComponent(query)}`);
+            document.getElementById("unique-output").innerHTML = formatSearchResult(uniqueData);
+        } catch (error) {
+            console.error("Error fetching unique data:", error);
+            document.getElementById("unique-output").innerText = 'Failed to fetch unique data.';
+        }
+    }
+
+    async function searchHierarchical() {
+        const query = document.getElementById("query-hierarchical").value.trim();
+        if (!query) {
+            alert("Please enter a search query.");
+            return;
+        }
+
+        document.getElementById("hierarchical-output").innerText = 'Loading...';
+
+        try {
+            const hierarchicalData = await fetchData(`http://localhost:8080/search/hierarchical?query=${encodeURIComponent(query)}`);
+            document.getElementById("hierarchical-output").innerHTML = formatSearchResult(hierarchicalData);
+        } catch (error) {
+            console.error("Error fetching hierarchical data:", error);
+            document.getElementById("hierarchical-output").innerText = 'Failed to fetch hierarchical data.';
+        }
+    }
+
+    async function searchTree() {
+        const query = document.getElementById("query-tree").value.trim();
+        if (!query) {
+            alert("Please enter a search query.");
+            return;
+        }
+
+        document.getElementById("tree-output").innerText = 'Loading...';
+
+        try {
+            const treeData = await fetchData(`http://localhost:8080/search/tree?query=${encodeURIComponent(query)}`);
+            document.getElementById("tree-output").innerHTML = formatSearchResult(treeData);
+        } catch (error) {
+            console.error("Error fetching tree data:", error);
+            document.getElementById("tree-output").innerText = 'Failed to fetch tree data.';
+        }
+    }
+
+
+    function formatSearchResult(data) {
+        if (!data || Object.keys(data).length === 0) {
+            return '<p>No results found.</p>';
+        }
+
+        const groupedByBook = {};
+
+        Object.keys(data).forEach(word => {
+            const item = data[word];
+
+            item.id.forEach((bookId, index) => {
+                const title = item.t[index] || "Unknown Title";
+                const positions = item.p[index] || [];
+                const paragraph = item.paragraph[index] || [];
+                const frequency = item.f[index] || 0;
+
+                if (!groupedByBook[bookId]) {
+                    groupedByBook[bookId] = {
+                        title: title,
+                        words: {}
+                    };
+                }
+
+                if (!groupedByBook[bookId].words[word]) {
+                    groupedByBook[bookId].words[word] = {
+                        positions: [],
+                        frequency: 0,
+                        paragraphs: []
+                    };
+                }
+
+                groupedByBook[bookId].words[word].positions = [...new Set(groupedByBook[bookId].words[word].positions.concat(positions))];
+                groupedByBook[bookId].words[word].paragraphs = [...new Set(groupedByBook[bookId].words[word].paragraphs.concat(paragraph))];
+                groupedByBook[bookId].words[word].frequency += frequency;
+            });
+        });
+
+        return Object.keys(groupedByBook).map(bookId => {
+            const bookData = groupedByBook[bookId];
+            return `
+            <div class="result-box">
+                <h4>
+                    <a href="http://localhost:8080/books/${bookId}.txt" target="_blank" style="text-decoration: none; color: blue;">
+                        ${bookData.title}
+                    </a>
+                </h4>
+                <p><strong>Book ID:</strong> ${bookId}</p>
+                ${Object.keys(bookData.words).map(word => {
+                const wordData = bookData.words[word];
+                return `
+                    <div class="word-group">
+                        <h5>Word: "${word}"</h5>
+                        <p><strong>Frequency:</strong> ${wordData.frequency}</p>
+                        <p><strong>Positions:</strong> ${wordData.positions.join(', ')}</p>
+                        <p><strong>Paragraphs:</strong> ${wordData.paragraphs.join(' ')}</p>
+                    </div>
+                `;
+            }).join('')}
+            </div>
+        `;
+        }).join('');
+    }
+
+    async function searchMetadata(event) {
+        event.preventDefault();
+
+        const title = document.getElementById('title').value;
+        const author = document.getElementById('author').value;
+        const language = document.getElementById('language').value;
+        const year = document.getElementById('year').value;
+        const month = document.getElementById('month').value;
+        const day = document.getElementById('day').value;
+
+        const resultDiv = document.getElementById('result-metadata');
+        const resultContainer = document.getElementById('results-container-metadata');
+        resultContainer.innerHTML = '';
+
+        const url = `http://localhost:8080/search/metadata?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&language=${encodeURIComponent(language)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&day=${encodeURIComponent(day)}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Request error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            resultDiv.style.display = 'block';
+
+            if (data.length === 0) {
+                resultContainer.textContent = 'No results found.';
+                return;
+            }
+
+            data.forEach(metadata => {
+                const title = metadata.title || 'Title not available';
+                const author = metadata.author || 'Unknown Author';
+                const releaseDate = metadata.releaseDate || 'Unknown Date';
+                const language = metadata.language || 'Unknown Language';
+                const documentId = metadata.id;
+
+                const snippet = `
+                Author: ${author},
+                Release Date: ${releaseDate},
+                Language: ${language}
+            `;
+
+                resultContainer.appendChild(createResultElement(title, snippet, documentId));
+            });
+        } catch (error) {
+            console.error('Error during the request:', error);
+            resultContainer.textContent = 'There was a problem with the search.';
+            resultDiv.style.display = 'block';
+        }
+    }
+
+    function createResultElement(title, snippet, documentId) {
+        const resultElement = document.createElement('div');
+        resultElement.classList.add('result');
+
+        const bookLink = documentId
+            ? `<a href="http://localhost:8080/books/${encodeURIComponent(documentId)}" target="_blank">${title}</a>`
+            : title;
+
+        resultElement.innerHTML = `<h4>${bookLink}</h4><p>${snippet}</p>`;
+        return resultElement;
+    }
+
+    async function fetchData(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    document.getElementById('metadata-search-form').addEventListener('submit', searchMetadata);
+
+</script>
+</body>
+</html>
